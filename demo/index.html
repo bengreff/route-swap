@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RouteSwap — Your commute is lying to you</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --green-50: #ECFDF5;
+  --green-100: #D1FAE5;
+  --green-500: #10B981;
+  --green-600: #059669;
+  --green-700: #047857;
+  --amber-50: #FFFBEB;
+  --amber-400: #FBBF24;
+  --amber-500: #F59E0B;
+  --red-50: #FEF2F2;
+  --red-400: #F87171;
+  --red-500: #EF4444;
+  --slate-50: #F8FAFC;
+  --slate-100: #F1F5F9;
+  --slate-200: #E2E8F0;
+  --slate-300: #CBD5E1;
+  --slate-400: #94A3B8;
+  --slate-500: #64748B;
+  --slate-600: #475569;
+  --slate-700: #334155;
+  --slate-800: #1E293B;
+  --slate-900: #0F172A;
+  --bg: #F8FAFC;
+  --card-bg: #FFFFFF;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.1), 0 2px 4px rgba(0,0,0,0.06);
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--slate-800);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 1.25rem;
+}
+
+/* ===== HERO ===== */
+.hero {
+  background: linear-gradient(135deg, var(--slate-900) 0%, var(--slate-800) 100%);
+  color: white;
+  padding: 3rem 0 2.5rem;
+  text-align: center;
+}
+
+.hero-logo {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 0.5rem;
+}
+
+.hero-logo span {
+  color: var(--green-500);
+}
+
+.hero-tagline {
+  font-size: 1.125rem;
+  color: var(--slate-400);
+  font-weight: 400;
+  margin-bottom: 2rem;
+}
+
+.hero-headline {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--slate-200);
+  margin-bottom: 2.5rem;
+  line-height: 1.4;
+}
+
+.hero-headline strong {
+  color: var(--green-500);
+  font-weight: 700;
+}
+
+.gauge-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 2.5rem;
+}
+
+.gauge {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: conic-gradient(var(--green-500) 0deg, var(--green-500) 0deg, var(--slate-700) 0deg, var(--slate-700) 360deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 1.5s ease-out;
+}
+
+.gauge-inner {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: var(--slate-900);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.gauge-value {
+  font-size: 3rem;
+  font-weight: 800;
+  color: var(--green-500);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.gauge-label {
+  font-size: 0.75rem;
+  color: var(--slate-400);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 0.25rem;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.stat-card {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 1.25rem 1rem;
+  text-align: center;
+}
+
+.stat-icon {
+  margin-bottom: 0.5rem;
+}
+
+.stat-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--slate-400);
+  margin-top: 0.25rem;
+}
+
+/* ===== MAP ===== */
+.map-section {
+  padding: 2rem 0 0;
+}
+
+.map-section .section-header {
+  margin-bottom: 1.25rem;
+}
+
+.map-wrapper {
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+  position: relative;
+}
+
+#map {
+  height: 420px;
+  width: 100%;
+  z-index: 1;
+}
+
+.map-legend {
+  display: flex;
+  gap: 1.25rem;
+  padding: 0.75rem 1rem;
+  background: var(--card-bg);
+  border-top: 1px solid var(--slate-100);
+  font-size: 0.75rem;
+  color: var(--slate-500);
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.legend-dot.green { background: var(--green-500); }
+.legend-dot.amber { background: var(--amber-400); }
+.legend-dot.gray { background: var(--slate-400); }
+.legend-dot.marker { width: 10px; height: 10px; border-radius: 50%; background: var(--slate-700); border: 2px solid white; }
+
+.map-tooltip {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.map-tooltip .popup-title {
+  font-weight: 600;
+  color: var(--slate-800);
+  margin-bottom: 0.25rem;
+}
+
+.map-tooltip .popup-route {
+  color: var(--slate-500);
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.map-tooltip .popup-compare {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.map-tooltip .popup-compare .label {
+  color: var(--slate-400);
+}
+
+.map-tooltip .popup-compare .val {
+  font-weight: 600;
+}
+
+.map-tooltip .popup-compare .val.drive { color: var(--slate-600); }
+.map-tooltip .popup-compare .val.bike { color: var(--green-600); }
+.map-tooltip .popup-compare .val.walk { color: var(--green-600); }
+
+.map-tooltip .popup-winner {
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  display: inline-block;
+}
+
+.map-tooltip .popup-winner.bike,
+.map-tooltip .popup-winner.walk { background: var(--green-50); color: var(--green-700); }
+.map-tooltip .popup-winner.close { background: var(--amber-50); color: var(--amber-500); }
+.map-tooltip .popup-winner.drive { background: var(--slate-100); color: var(--slate-600); }
+
+.leaflet-popup-content-wrapper {
+  border-radius: 10px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+}
+
+.leaflet-popup-content {
+  margin: 0.75rem 1rem !important;
+}
+
+@media (max-width: 640px) {
+  #map { height: 300px; }
+}
+
+/* ===== TABS ===== */
+.tabs-section {
+  padding: 1.5rem 0 0;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 10;
+}
+
+.tab-row {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.75rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.tab-row::-webkit-scrollbar { display: none; }
+
+.tab-btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+  background: var(--card-bg);
+  color: var(--slate-600);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.tab-btn:hover {
+  border-color: var(--slate-300);
+  background: var(--slate-50);
+}
+
+.tab-btn.active {
+  background: var(--slate-800);
+  color: white;
+  border-color: var(--slate-800);
+}
+
+.tab-btn.active-green {
+  background: var(--green-600);
+  color: white;
+  border-color: var(--green-600);
+}
+
+.filter-row {
+  display: flex;
+  gap: 0.375rem;
+  padding-bottom: 1rem;
+}
+
+.filter-btn {
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--slate-500);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.filter-btn:hover {
+  background: var(--slate-100);
+}
+
+.filter-btn.active {
+  background: var(--slate-200);
+  color: var(--slate-800);
+}
+
+/* ===== TRIP CARDS ===== */
+.trips-section {
+  padding-bottom: 2rem;
+}
+
+.day-header {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--slate-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1rem 0 0.5rem;
+}
+
+.trip-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 0.75rem;
+  border-left: 4px solid var(--slate-300);
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+  animation: cardFadeIn 0.4s ease-out both;
+}
+
+.trip-card:hover {
+  box-shadow: var(--card-shadow-hover);
+}
+
+.trip-card.bike-wins { border-left-color: var(--green-500); }
+.trip-card.walk-wins { border-left-color: var(--green-500); }
+.trip-card.close-call { border-left-color: var(--amber-400); }
+.trip-card.drive-wins { border-left-color: var(--slate-300); }
+
+.trip-card-header {
+  padding: 1rem 1.25rem 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.trip-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.375rem;
+}
+
+.trip-time {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--slate-500);
+}
+
+.trip-day-pill {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  background: var(--slate-100);
+  color: var(--slate-500);
+}
+
+.trip-badge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  margin-left: auto;
+  letter-spacing: 0.02em;
+}
+
+.trip-badge.bike { background: var(--green-50); color: var(--green-700); }
+.trip-badge.walk { background: var(--green-50); color: var(--green-700); }
+.trip-badge.drive { background: var(--slate-100); color: var(--slate-600); }
+.trip-badge.close { background: var(--amber-50); color: var(--amber-500); }
+
+.trip-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--slate-800);
+  margin-bottom: 0.25rem;
+}
+
+.trip-route {
+  font-size: 0.8125rem;
+  color: var(--slate-500);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.trip-route-arrow {
+  color: var(--slate-300);
+}
+
+.map-link {
+  margin-left: auto;
+  color: var(--green-600);
+  font-weight: 500;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.map-link:hover {
+  color: var(--green-700);
+  text-decoration: underline;
+}
+
+/* Comparison bars */
+.comparison-bars {
+  padding: 0 1.25rem 1rem;
+}
+
+.mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.mode-bar:last-child { margin-bottom: 0; }
+
+.mode-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mode-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.mode-icon.drive { background: var(--slate-100); color: var(--slate-600); }
+.mode-icon.bike { background: var(--green-50); color: var(--green-600); }
+.mode-icon.walk { background: var(--green-50); color: var(--green-600); }
+
+.mode-bar-track {
+  flex: 1;
+  height: 28px;
+  background: var(--slate-50);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.mode-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding: 0 0.75rem;
+  min-width: 100px;
+  transition: width 0.6s ease-out;
+}
+
+.mode-bar-fill.drive { background: var(--slate-200); }
+.mode-bar-fill.bike { background: var(--green-100); }
+.mode-bar-fill.walk { background: var(--green-100); }
+.mode-bar-fill.winner { background: var(--green-500); }
+.mode-bar-fill.winner .mode-bar-time,
+.mode-bar-fill.winner .mode-bar-cost { color: white; }
+
+.mode-bar-time {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--slate-700);
+  white-space: nowrap;
+}
+
+.mode-bar-cost {
+  font-size: 0.6875rem;
+  color: var(--slate-500);
+  margin-left: 0.5rem;
+  white-space: nowrap;
+}
+
+.mode-bar-fill.winner .mode-bar-cost { color: rgba(255,255,255,0.8); }
+
+.mode-bar-saved {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--green-600);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+/* Expandable detail */
+.trip-detail {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.trip-detail.open {
+  max-height: 600px;
+}
+
+.trip-detail-inner {
+  padding: 0 1.25rem 1.25rem;
+  border-top: 1px solid var(--slate-100);
+}
+
+.detail-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.detail-col h4 {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.detail-col.drive-detail h4 { color: var(--slate-600); }
+.detail-col.bike-detail h4 { color: var(--green-700); }
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0;
+  color: var(--slate-600);
+}
+
+.detail-row span:last-child {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-row.highlight span:last-child {
+  color: var(--red-500);
+  font-weight: 600;
+}
+
+.detail-divider {
+  border-top: 1px dashed var(--slate-200);
+  margin: 0.375rem 0;
+}
+
+.detail-total {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  font-weight: 700;
+  padding-top: 0.375rem;
+  color: var(--slate-800);
+}
+
+.safety-rating {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.safety-stars { display: flex; gap: 2px; }
+
+.star {
+  width: 14px;
+  height: 14px;
+}
+
+.star.filled { color: var(--green-500); }
+.star.empty { color: var(--slate-200); }
+.star.filled.amber { color: var(--amber-400); }
+.star.filled.red { color: var(--red-400); }
+
+.safety-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  margin-left: 0.25rem;
+}
+
+.route-description {
+  font-size: 0.75rem;
+  color: var(--slate-500);
+  margin-top: 0.375rem;
+  font-style: italic;
+}
+
+.expand-hint {
+  text-align: center;
+  padding: 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--slate-400);
+}
+
+/* ===== WHY NOT GOOGLE ===== */
+.why-section {
+  padding: 3rem 0;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.section-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin-bottom: 0.5rem;
+}
+
+.section-header p {
+  color: var(--slate-500);
+  font-size: 0.9375rem;
+}
+
+.why-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 2.5rem;
+}
+
+.why-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: var(--card-shadow);
+}
+
+.why-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--red-50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.why-card-icon svg {
+  width: 20px;
+  height: 20px;
+  color: var(--red-500);
+}
+
+.why-card h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--slate-800);
+  margin-bottom: 0.375rem;
+}
+
+.why-card p {
+  font-size: 0.8125rem;
+  color: var(--slate-500);
+  line-height: 1.5;
+}
+
+.why-card .example {
+  margin-top: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  background: var(--slate-50);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  color: var(--slate-600);
+  border-left: 3px solid var(--red-400);
+}
+
+/* Comparison table */
+.comparison-table-wrapper {
+  background: var(--card-bg);
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.comparison-table th {
+  text-align: left;
+  padding: 0.875rem 1rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--slate-50);
+  color: var(--slate-500);
+  border-bottom: 1px solid var(--slate-200);
+}
+
+.comparison-table th:nth-child(3) { color: var(--green-700); }
+
+.comparison-table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--slate-100);
+  color: var(--slate-600);
+}
+
+.comparison-table tr:last-child td { border-bottom: none; }
+
+.comparison-table td:nth-child(2) { color: var(--slate-400); }
+.comparison-table td:nth-child(3) { color: var(--green-700); font-weight: 500; }
+
+/* ===== CTA / FOOTER ===== */
+.cta-section {
+  text-align: center;
+  padding: 2rem 0 4rem;
+}
+
+.cta-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem 2rem;
+  background: var(--green-600);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+
+.cta-btn:hover { background: var(--green-700); }
+
+.cta-sub {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  color: var(--slate-500);
+}
+
+.cta-fine {
+  margin-top: 0.5rem;
+  font-size: 0.6875rem;
+  color: var(--slate-400);
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 640px) {
+  .hero { padding: 2rem 0 2rem; }
+  .hero-tagline { font-size: 1rem; }
+  .hero-headline { font-size: 1.0625rem; }
+  .gauge { width: 150px; height: 150px; }
+  .gauge-inner { width: 116px; height: 116px; }
+  .gauge-value { font-size: 2.5rem; }
+  .stats-row { grid-template-columns: 1fr; gap: 0.5rem; }
+  .stat-card { padding: 1rem; display: flex; align-items: center; gap: 0.75rem; text-align: left; }
+  .stat-icon { margin-bottom: 0; }
+  .why-grid { grid-template-columns: 1fr; }
+  .detail-columns { grid-template-columns: 1fr; }
+  .comparison-table { font-size: 0.75rem; }
+  .comparison-table th, .comparison-table td { padding: 0.625rem 0.625rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-logo">Route<span>Swap</span></div>
+    <div class="hero-tagline">Your commute is lying to you.</div>
+    <div class="hero-headline" id="hero-headline"></div>
+    <div class="gauge-wrapper">
+      <div class="gauge" id="gauge">
+        <div class="gauge-inner">
+          <div class="gauge-value" id="gauge-value">0%</div>
+          <div class="gauge-label">Swappable</div>
+        </div>
+      </div>
+    </div>
+    <div class="stats-row" id="stats-row"></div>
+  </div>
+</section>
+
+<!-- MAP -->
+<section class="map-section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Austin Route Map</h2>
+      <p>Click any route to see the drive vs. bike breakdown. Green = bike wins, amber = close call.</p>
+    </div>
+    <div class="map-wrapper">
+      <div id="map"></div>
+      <div class="map-legend">
+        <div class="legend-item"><div class="legend-dot green"></div> Bike/walk faster</div>
+        <div class="legend-item"><div class="legend-dot amber"></div> Close call</div>
+        <div class="legend-item"><div class="legend-dot gray"></div> Drive faster</div>
+        <div class="legend-item"><div class="legend-dot marker"></div> Location</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TABS -->
+<div class="tabs-section">
+  <div class="container">
+    <div class="tab-row" id="day-tabs"></div>
+    <div class="filter-row" id="filter-tabs"></div>
+  </div>
+</div>
+
+<!-- TRIPS -->
+<section class="trips-section">
+  <div class="container" id="trips-container"></div>
+</section>
+
+<!-- WHY NOT GOOGLE -->
+<section class="why-section">
+  <div class="container">
+    <div class="section-header">
+      <h2>Why Google Maps Can't Do This</h2>
+      <p>Six reasons your navigation app is keeping you stuck in traffic.</p>
+    </div>
+    <div class="why-grid" id="why-grid"></div>
+    <div class="comparison-table-wrapper">
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>What you need</th>
+            <th>Google Maps</th>
+            <th>RouteSwap</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Safe bike routes</td>
+            <td>Routes on arterials</td>
+            <td>Protected lane preference + safety 1-5</td>
+          </tr>
+          <tr>
+            <td>Your cycling speed</td>
+            <td>Flat 8 mph for everyone</td>
+            <td>Learns from your rides</td>
+          </tr>
+          <tr>
+            <td>Real door-to-door time</td>
+            <td>Curb-to-curb only</td>
+            <td>Parking search + walk + cost included</td>
+          </tr>
+          <tr>
+            <td>Weekly trip analysis</td>
+            <td>One trip at a time</td>
+            <td>Analyzes your entire calendar</td>
+          </tr>
+          <tr>
+            <td>Proactive mode comparison</td>
+            <td>Manual switching</td>
+            <td>Auto-compares all modes</td>
+          </tr>
+          <tr>
+            <td>Future traffic prediction</td>
+            <td>Current traffic only</td>
+            <td>Models by day and hour</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="container">
+    <button class="cta-btn" onclick="alert('Coming soon! Sign up at routeswap.io')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      Connect Your Calendar
+    </button>
+    <div class="cta-sub">Built for Austin. Coming to your city.</div>
+    <div class="cta-fine">Demo prototype — data is simulated</div>
+  </div>
+</section>
+
+<script>
+// ===== SVG ICONS =====
+const ICONS = {
+  car: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14M5 17a2 2 0 01-2-2V9a2 2 0 012-2h1l2-3h8l2 3h1a2 2 0 012 2v6a2 2 0 01-2 2M5 17v2m14-2v2"/><circle cx="7.5" cy="14.5" r="1.5"/><circle cx="16.5" cy="14.5" r="1.5"/></svg>`,
+  bike: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 100-2 1 1 0 000 2z" fill="currentColor"/><path d="M12 17.5V14l-3-3 4-3 2 3h3"/></svg>`,
+  walk: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="2"/><path d="M14 7l-2 9M10 7l2 9"/><path d="M10 16l-2 5M14 16l2 5"/><path d="M8 10h8"/></svg>`,
+  clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  dollar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`,
+  leaf: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.3c.48.17.98.3 1.34.3C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5s1.75 3.75 1.75 3.75"/></svg>`,
+  star: `<svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="currentColor"/></svg>`,
+  starEmpty: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+  shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>`,
+  speed: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M12 6v6l4 2"/></svg>`,
+  parking: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 17V7h4a3 3 0 010 6H9"/></svg>`,
+  split: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>`,
+  calendar: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  traffic: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"/><circle cx="12" cy="7" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="17" r="1.5" fill="currentColor"/></svg>`,
+};
+
+// ===== DATA MODEL =====
+const LOCATIONS = {
+  'hyde-park': { name: 'Home (Hyde Park)', shortName: 'Home', lat: 30.3050, lng: -97.7270 },
+  'ut-campus': { name: 'UT Austin Campus', shortName: 'UT Campus', lat: 30.2849, lng: -97.7341 },
+  'downtown-farewell': { name: 'Farewell (Downtown)', shortName: 'Downtown', lat: 30.2672, lng: -97.7431 },
+  'rainey-st': { name: 'Rainey Street', shortName: 'Rainey St', lat: 30.2585, lng: -97.7390 },
+  'the-domain': { name: 'The Domain', shortName: 'The Domain', lat: 30.4021, lng: -97.7253 },
+  'capital-factory': { name: 'Capital Factory (Downtown)', shortName: 'Capital Factory', lat: 30.2686, lng: -97.7425 },
+  'soco-gym': { name: 'South Congress Gym', shortName: 'SoCo Gym', lat: 30.2490, lng: -97.7490 },
+  'convention-center': { name: 'Austin Convention Center', shortName: 'Convention Ctr', lat: 30.2635, lng: -97.7395 },
+  'south-congress': { name: 'South Congress', shortName: 'SoCo', lat: 30.2500, lng: -97.7487 },
+  'east-austin': { name: 'Eastside (E. Cesar Chavez)', shortName: 'East Austin', lat: 30.2580, lng: -97.7240 },
+  'north-loop': { name: 'North Loop Food Trucks', shortName: 'North Loop', lat: 30.3180, lng: -97.7230 },
+  'zilker': { name: 'Zilker Park', shortName: 'Zilker', lat: 30.2670, lng: -97.7730 },
+};
+
+const ROUTES = {
+  'hyde-park|ut-campus': {
+    distanceMiles: 2.4,
+    drive: { baseMin: 8, rushMin: 14, parkSearchMin: 8, parkWalkMin: 4, parkCost: 10 },
+    bike: { baseMin: 11, safetyRating: 4, route: 'Guadalupe bike lane → Speedway', protectedPct: 70, terrain: 'flat' },
+    walk: { baseMin: 48, viable: false },
+    waypoints: [[30.3050,-97.7270],[30.3020,-97.7280],[30.2980,-97.7310],[30.2940,-97.7335],[30.2900,-97.7340],[30.2849,-97.7341]],
+  },
+  'ut-campus|downtown-farewell': {
+    distanceMiles: 1.8,
+    drive: { baseMin: 6, rushMin: 10, parkSearchMin: 10, parkWalkMin: 4, parkCost: 12 },
+    bike: { baseMin: 9, safetyRating: 4, route: 'Guadalupe → Congress Ave protected lane', protectedPct: 75, terrain: 'flat' },
+    walk: { baseMin: 36, viable: false },
+    waypoints: [[30.2849,-97.7341],[30.2810,-97.7360],[30.2780,-97.7380],[30.2740,-97.7400],[30.2710,-97.7420],[30.2672,-97.7431]],
+  },
+  'downtown-farewell|rainey-st': {
+    distanceMiles: 0.5,
+    drive: { baseMin: 4, rushMin: 8, parkSearchMin: 12, parkWalkMin: 3, parkCost: 15 },
+    bike: { baseMin: 3, safetyRating: 5, route: 'Sabine St bike path', protectedPct: 90, terrain: 'flat' },
+    walk: { baseMin: 10, viable: true },
+    waypoints: [[30.2672,-97.7431],[30.2650,-97.7420],[30.2620,-97.7400],[30.2585,-97.7390]],
+  },
+  'hyde-park|the-domain': {
+    distanceMiles: 10.2,
+    drive: { baseMin: 18, rushMin: 28, parkSearchMin: 3, parkWalkMin: 3, parkCost: 0 },
+    bike: { baseMin: 52, safetyRating: 1, route: 'Burnet Rd — no bike infrastructure', protectedPct: 5, terrain: 'hilly' },
+    walk: { baseMin: 204, viable: false },
+    waypoints: [[30.3050,-97.7270],[30.3120,-97.7280],[30.3200,-97.7290],[30.3300,-97.7280],[30.3420,-97.7270],[30.3550,-97.7260],[30.3700,-97.7255],[30.3850,-97.7254],[30.4021,-97.7253]],
+  },
+  'the-domain|capital-factory': {
+    distanceMiles: 9.5,
+    drive: { baseMin: 15, rushMin: 25, parkSearchMin: 8, parkWalkMin: 3, parkCost: 8 },
+    bike: { baseMin: 48, safetyRating: 2, route: 'Burnet Rd → Lamar — limited bike lanes', protectedPct: 15, terrain: 'mixed' },
+    walk: { baseMin: 190, viable: false },
+    waypoints: [[30.4021,-97.7253],[30.3850,-97.7254],[30.3700,-97.7255],[30.3550,-97.7300],[30.3400,-97.7350],[30.3200,-97.7380],[30.3000,-97.7400],[30.2850,-97.7420],[30.2686,-97.7425]],
+  },
+  'capital-factory|soco-gym': {
+    distanceMiles: 1.5,
+    drive: { baseMin: 5, rushMin: 10, parkSearchMin: 5, parkWalkMin: 2, parkCost: 0 },
+    bike: { baseMin: 8, safetyRating: 3, route: 'Congress Ave bridge bike lane', protectedPct: 50, terrain: 'flat' },
+    walk: { baseMin: 30, viable: false },
+    waypoints: [[30.2686,-97.7425],[30.2660,-97.7440],[30.2630,-97.7460],[30.2585,-97.7475],[30.2540,-97.7485],[30.2490,-97.7490]],
+  },
+  'hyde-park|convention-center': {
+    distanceMiles: 3.2,
+    drive: { baseMin: 10, rushMin: 18, parkSearchMin: 10, parkWalkMin: 4, parkCost: 15 },
+    bike: { baseMin: 15, safetyRating: 4, route: 'Shoal Creek Trail → 2nd St protected lane', protectedPct: 80, terrain: 'flat' },
+    walk: { baseMin: 64, viable: false },
+    waypoints: [[30.3050,-97.7270],[30.3000,-97.7320],[30.2950,-97.7380],[30.2900,-97.7430],[30.2850,-97.7460],[30.2800,-97.7470],[30.2740,-97.7450],[30.2690,-97.7420],[30.2635,-97.7395]],
+  },
+  'convention-center|south-congress': {
+    distanceMiles: 1.2,
+    drive: { baseMin: 5, rushMin: 8, parkSearchMin: 6, parkWalkMin: 2, parkCost: 0 },
+    bike: { baseMin: 6, safetyRating: 3, route: 'Congress Ave bridge', protectedPct: 40, terrain: 'flat' },
+    walk: { baseMin: 24, viable: true },
+    waypoints: [[30.2635,-97.7395],[30.2610,-97.7420],[30.2580,-97.7450],[30.2550,-97.7470],[30.2500,-97.7487]],
+  },
+  'south-congress|east-austin': {
+    distanceMiles: 2.1,
+    drive: { baseMin: 7, rushMin: 10, parkSearchMin: 3, parkWalkMin: 2, parkCost: 0 },
+    bike: { baseMin: 11, safetyRating: 3, route: 'Riverside Dr → Pleasant Valley', protectedPct: 35, terrain: 'flat' },
+    walk: { baseMin: 42, viable: false },
+    waypoints: [[30.2500,-97.7487],[30.2490,-97.7450],[30.2485,-97.7400],[30.2500,-97.7350],[30.2530,-97.7300],[30.2560,-97.7260],[30.2580,-97.7240]],
+  },
+  'ut-campus|north-loop': {
+    distanceMiles: 1.8,
+    drive: { baseMin: 6, rushMin: 8, parkSearchMin: 3, parkWalkMin: 2, parkCost: 0 },
+    bike: { baseMin: 9, safetyRating: 4, route: 'Duval St → North Loop neighborhood streets', protectedPct: 60, terrain: 'flat' },
+    walk: { baseMin: 36, viable: false },
+    waypoints: [[30.2849,-97.7341],[30.2900,-97.7310],[30.2950,-97.7280],[30.3000,-97.7260],[30.3060,-97.7245],[30.3120,-97.7235],[30.3180,-97.7230]],
+  },
+  'hyde-park|capital-factory': {
+    distanceMiles: 3.0,
+    drive: { baseMin: 9, rushMin: 16, parkSearchMin: 10, parkWalkMin: 3, parkCost: 12 },
+    bike: { baseMin: 14, safetyRating: 4, route: 'Guadalupe → Lavaca St → 3rd St', protectedPct: 65, terrain: 'flat' },
+    walk: { baseMin: 60, viable: false },
+    waypoints: [[30.3050,-97.7270],[30.3010,-97.7290],[30.2960,-97.7320],[30.2910,-97.7350],[30.2860,-97.7370],[30.2810,-97.7390],[30.2760,-97.7410],[30.2720,-97.7420],[30.2686,-97.7425]],
+  },
+  'capital-factory|zilker': {
+    distanceMiles: 2.8,
+    drive: { baseMin: 8, rushMin: 14, parkSearchMin: 8, parkWalkMin: 4, parkCost: 0 },
+    bike: { baseMin: 14, safetyRating: 3, route: 'Lamar Blvd bike lane → Barton Springs Rd', protectedPct: 45, terrain: 'gentle slope' },
+    walk: { baseMin: 56, viable: false },
+    waypoints: [[30.2686,-97.7425],[30.2700,-97.7460],[30.2710,-97.7500],[30.2720,-97.7540],[30.2710,-97.7580],[30.2700,-97.7620],[30.2690,-97.7670],[30.2670,-97.7730]],
+  },
+};
+
+const EVENTS = [
+  { id: 1, day: 'Monday', dayShort: 'Mon', time: '8:30 AM', timeHour: 8.5, title: 'Team Standup', from: 'hyde-park', to: 'ut-campus', category: 'work' },
+  { id: 2, day: 'Monday', dayShort: 'Mon', time: '12:00 PM', timeHour: 12, title: 'Investor Lunch', from: 'ut-campus', to: 'downtown-farewell', category: 'work' },
+  { id: 3, day: 'Monday', dayShort: 'Mon', time: '5:30 PM', timeHour: 17.5, title: 'Happy Hour', from: 'downtown-farewell', to: 'rainey-st', category: 'social' },
+  { id: 4, day: 'Tuesday', dayShort: 'Tue', time: '9:00 AM', timeHour: 9, title: 'Client Meeting', from: 'hyde-park', to: 'the-domain', category: 'work' },
+  { id: 5, day: 'Tuesday', dayShort: 'Tue', time: '2:00 PM', timeHour: 14, title: 'Coworking Session', from: 'the-domain', to: 'capital-factory', category: 'work' },
+  { id: 6, day: 'Tuesday', dayShort: 'Tue', time: '6:00 PM', timeHour: 18, title: 'Fitness Class', from: 'capital-factory', to: 'soco-gym', category: 'fitness' },
+  { id: 7, day: 'Wednesday', dayShort: 'Wed', time: '9:00 AM', timeHour: 9, title: 'Startup Workshop', from: 'hyde-park', to: 'convention-center', category: 'work' },
+  { id: 8, day: 'Wednesday', dayShort: 'Wed', time: '12:30 PM', timeHour: 12.5, title: 'Team Lunch', from: 'convention-center', to: 'south-congress', category: 'food' },
+  { id: 9, day: 'Wednesday', dayShort: 'Wed', time: '4:00 PM', timeHour: 16, title: 'Coffee Meeting', from: 'south-congress', to: 'east-austin', category: 'work' },
+  { id: 10, day: 'Thursday', dayShort: 'Thu', time: '10:00 AM', timeHour: 10, title: 'Pitch Practice', from: 'hyde-park', to: 'ut-campus', category: 'work' },
+  { id: 11, day: 'Thursday', dayShort: 'Thu', time: '1:00 PM', timeHour: 13, title: 'Lunch Break', from: 'ut-campus', to: 'north-loop', category: 'food' },
+  { id: 12, day: 'Friday', dayShort: 'Fri', time: '9:00 AM', timeHour: 9, title: 'Demo Day Prep', from: 'hyde-park', to: 'capital-factory', category: 'work' },
+  { id: 13, day: 'Friday', dayShort: 'Fri', time: '5:00 PM', timeHour: 17, title: 'Demo Day Celebration', from: 'capital-factory', to: 'zilker', category: 'social' },
+];
+
+const USER_PROFILE = { bikeSpeedMph: 12, walkSpeedMph: 3.2, name: 'Alex' };
+
+// ===== COMPUTATION =====
+function isRushHour(h) {
+  return (h >= 7.5 && h <= 9.5) || (h >= 16.5 && h <= 18.5);
+}
+
+function computeTrip(event) {
+  const key = `${event.from}|${event.to}`;
+  const route = ROUTES[key];
+  if (!route) return null;
+
+  const rush = isRushHour(event.timeHour);
+  const driveBase = rush ? route.drive.rushMin : route.drive.baseMin;
+  const driveTotal = driveBase + route.drive.parkSearchMin + route.drive.parkWalkMin;
+  const driveCost = route.drive.parkCost + Math.round(route.distanceMiles * 0.67 * 100) / 100;
+
+  const bikeTotal = route.bike.baseMin + 1;
+  const walkTotal = route.walk.baseMin;
+  const walkViable = route.walk.viable;
+
+  let winner, timeSaved;
+  const candidates = [{ mode: 'drive', time: driveTotal }];
+  if (route.bike.safetyRating >= 2) candidates.push({ mode: 'bike', time: bikeTotal });
+  if (walkViable) candidates.push({ mode: 'walk', time: walkTotal });
+
+  candidates.sort((a, b) => a.time - b.time);
+  const fastest = candidates[0];
+
+  if (fastest.mode === 'drive') {
+    winner = 'drive';
+    timeSaved = 0;
+  } else if (Math.abs(driveTotal - fastest.time) <= 5 && fastest.mode !== 'walk') {
+    winner = 'close';
+    timeSaved = driveTotal - fastest.time;
+  } else {
+    winner = fastest.mode;
+    timeSaved = driveTotal - fastest.time;
+  }
+
+  return {
+    event,
+    route,
+    rush,
+    driveBase,
+    driveTotal,
+    driveCost,
+    bikeTotal,
+    walkTotal,
+    walkViable,
+    winner,
+    timeSaved,
+    moneySaved: winner !== 'drive' ? driveCost : 0,
+    co2Saved: winner !== 'drive' ? Math.round(route.distanceMiles * 0.89 * 10) / 10 : 0,
+  };
+}
+
+function computeSummary(trips) {
+  const swappable = trips.filter(t => t.winner === 'bike' || t.winner === 'walk' || t.winner === 'close');
+  const totalTime = trips.reduce((s, t) => s + (t.winner !== 'drive' ? t.timeSaved : 0), 0);
+  const totalMoney = trips.reduce((s, t) => s + t.moneySaved, 0);
+  const totalCO2 = trips.reduce((s, t) => s + t.co2Saved, 0);
+  return {
+    total: trips.length,
+    swappable: swappable.length,
+    pct: Math.round((swappable.length / trips.length) * 100),
+    timeSaved: totalTime,
+    moneySaved: Math.round(totalMoney),
+    co2Saved: Math.round(totalCO2 * 10) / 10,
+  };
+}
+
+// ===== RENDERING =====
+function renderStars(rating) {
+  let color = 'filled';
+  if (rating <= 2) color = 'filled red';
+  else if (rating === 3) color = 'filled amber';
+  let html = '';
+  for (let i = 1; i <= 5; i++) {
+    html += `<span class="star ${i <= rating ? color : 'empty'}">${i <= rating ? ICONS.star : ICONS.starEmpty}</span>`;
+  }
+  return html;
+}
+
+function safetyText(rating) {
+  if (rating >= 4) return { text: 'Protected route', color: 'var(--green-600)' };
+  if (rating === 3) return { text: 'Mixed traffic', color: 'var(--amber-500)' };
+  return { text: 'Not recommended', color: 'var(--red-500)' };
+}
+
+function formatMinutes(m) {
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const r = m % 60;
+    return r > 0 ? `${h}hr ${r}min` : `${h}hr`;
+  }
+  return `${m} min`;
+}
+
+function renderHero(summary) {
+  document.getElementById('hero-headline').innerHTML =
+    `Last week, Alex drove to <strong>${summary.total}</strong> places.<br><strong>${summary.swappable} would have been faster by bike or on foot.</strong>`;
+
+  const statsHtml = `
+    <div class="stat-card">
+      <div class="stat-icon" style="color: var(--green-500)">${ICONS.clock}</div>
+      <div>
+        <div class="stat-value" data-target="${summary.timeSaved}" data-suffix=" min">0 min</div>
+        <div class="stat-label">Time saved this week</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="color: var(--green-500)">${ICONS.dollar}</div>
+      <div>
+        <div class="stat-value" data-target="${summary.moneySaved}" data-prefix="$">$0</div>
+        <div class="stat-label">Parking &amp; gas saved</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="color: var(--green-500)">${ICONS.leaf}</div>
+      <div>
+        <div class="stat-value" data-target="${summary.co2Saved}" data-suffix=" lbs" data-decimals="1">0 lbs</div>
+        <div class="stat-label">CO₂ avoided</div>
+      </div>
+    </div>`;
+  document.getElementById('stats-row').innerHTML = statsHtml;
+}
+
+function renderDayTabs() {
+  const days = ['All Week', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  document.getElementById('day-tabs').innerHTML = days.map(d =>
+    `<button class="tab-btn ${d === 'All Week' ? 'active' : ''}" data-day="${d}" onclick="filterDay('${d}')">${d}</button>`
+  ).join('');
+
+  const filters = ['All', 'Bike Wins', 'Drive Wins', 'Close Calls'];
+  document.getElementById('filter-tabs').innerHTML = filters.map(f =>
+    `<button class="filter-btn ${f === 'All' ? 'active' : ''}" data-filter="${f}" onclick="filterMode('${f}')">${f}</button>`
+  ).join('');
+}
+
+function renderTrips(trips, dayFilter, modeFilter) {
+  let filtered = trips;
+  if (dayFilter !== 'All Week') {
+    filtered = filtered.filter(t => t.event.dayShort === dayFilter);
+  }
+  if (modeFilter === 'Bike Wins') {
+    filtered = filtered.filter(t => t.winner === 'bike' || t.winner === 'walk');
+  } else if (modeFilter === 'Drive Wins') {
+    filtered = filtered.filter(t => t.winner === 'drive');
+  } else if (modeFilter === 'Close Calls') {
+    filtered = filtered.filter(t => t.winner === 'close');
+  }
+
+  let html = '';
+  let lastDay = '';
+  filtered.forEach((trip, i) => {
+    if (trip.event.day !== lastDay) {
+      lastDay = trip.event.day;
+      html += `<div class="day-header">${trip.event.day}</div>`;
+    }
+    html += renderTripCard(trip, i);
+  });
+
+  if (filtered.length === 0) {
+    html = `<div style="text-align:center;padding:3rem;color:var(--slate-400)">No trips match this filter.</div>`;
+  }
+
+  document.getElementById('trips-container').innerHTML = html;
+}
+
+function renderTripCard(trip, index) {
+  const from = LOCATIONS[trip.event.from];
+  const to = LOCATIONS[trip.event.to];
+  const cardClass = trip.winner === 'close' ? 'close-call' : `${trip.winner}-wins`;
+
+  let badgeClass, badgeText;
+  if (trip.winner === 'bike') { badgeClass = 'bike'; badgeText = `Bike saves ${trip.timeSaved} min`; }
+  else if (trip.winner === 'walk') { badgeClass = 'walk'; badgeText = `Walk saves ${trip.timeSaved} min`; }
+  else if (trip.winner === 'close') { badgeClass = 'close'; badgeText = 'Close call'; }
+  else { badgeClass = 'drive'; badgeText = 'Drive wins'; }
+
+  const maxTime = Math.max(trip.driveTotal, trip.bikeTotal, trip.walkViable ? trip.walkTotal : 0);
+
+  const driveWidth = Math.round((trip.driveTotal / maxTime) * 100);
+  const bikeWidth = Math.round((trip.bikeTotal / maxTime) * 100);
+  const walkWidth = trip.walkViable ? Math.round((trip.walkTotal / maxTime) * 100) : 0;
+
+  const driveIsWinner = trip.winner === 'drive';
+  const bikeIsWinner = trip.winner === 'bike' || (trip.winner === 'close' && trip.bikeTotal <= trip.driveTotal);
+  const walkIsWinner = trip.winner === 'walk';
+
+  const safety = safetyText(trip.route.bike.safetyRating);
+
+  let walkBar = '';
+  if (trip.walkViable) {
+    walkBar = `
+      <div class="mode-bar">
+        <div class="mode-icon walk">${ICONS.walk}</div>
+        <div class="mode-bar-track">
+          <div class="mode-bar-fill walk ${walkIsWinner ? 'winner' : ''}" style="width:${walkWidth}%">
+            <span class="mode-bar-time">${trip.walkTotal} min</span>
+            <span class="mode-bar-cost">Free</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const driveBreakdown = `
+    <div class="detail-col drive-detail">
+      <h4>${ICONS.car} Driving</h4>
+      <div class="detail-row"><span>Base drive time</span><span>${trip.rush ? trip.route.drive.rushMin : trip.route.drive.baseMin} min${trip.rush ? ' (rush hr)' : ''}</span></div>
+      <div class="detail-row highlight"><span>Parking search</span><span>+${trip.route.drive.parkSearchMin} min</span></div>
+      <div class="detail-row"><span>Walk from lot</span><span>+${trip.route.drive.parkWalkMin} min</span></div>
+      <div class="detail-divider"></div>
+      <div class="detail-total"><span>Door-to-door</span><span>${trip.driveTotal} min</span></div>
+      <div class="detail-row" style="margin-top:0.5rem"><span>Parking cost</span><span>$${trip.route.drive.parkCost}</span></div>
+      <div class="detail-row"><span>Gas cost</span><span>$${(trip.route.distanceMiles * 0.67).toFixed(2)}</span></div>
+    </div>`;
+
+  const bikeBreakdown = `
+    <div class="detail-col bike-detail">
+      <h4>${ICONS.bike} Biking</h4>
+      <div class="detail-row"><span>Ride time (${USER_PROFILE.bikeSpeedMph} mph)</span><span>${trip.route.bike.baseMin} min</span></div>
+      <div class="detail-row"><span>Lock up</span><span>+1 min</span></div>
+      <div class="detail-divider"></div>
+      <div class="detail-total"><span>Door-to-door</span><span>${trip.bikeTotal} min</span></div>
+      <div class="safety-rating" style="margin-top:0.75rem">
+        <div class="safety-stars">${renderStars(trip.route.bike.safetyRating)}</div>
+        <span class="safety-label" style="color:${safety.color}">${safety.text}</span>
+      </div>
+      <div class="detail-row" style="margin-top:0.375rem"><span>Protected lanes</span><span>${trip.route.bike.protectedPct}%</span></div>
+      <div class="route-description">${trip.route.bike.route}</div>
+    </div>`;
+
+  return `
+    <div class="trip-card ${cardClass}" data-trip-id="${trip.event.id}" style="animation-delay:${index * 0.06}s">
+      <div class="trip-card-header" onclick="toggleDetail(${trip.event.id})">
+        <div class="trip-meta">
+          <span class="trip-time">${trip.event.time}</span>
+          <span class="trip-day-pill">${trip.event.dayShort}</span>
+          <span class="trip-badge ${badgeClass}">${badgeText}</span>
+        </div>
+        <div class="trip-title">${trip.event.title}</div>
+        <div class="trip-route">
+          <span>${from.shortName}</span>
+          <span class="trip-route-arrow">→</span>
+          <span>${to.shortName}</span>
+          <span style="color:var(--slate-300);margin-left:0.25rem">${trip.route.distanceMiles} mi</span>
+          <span class="map-link" onclick="event.stopPropagation(); scrollToMapAndHighlight(${trip.event.id})">Show on map</span>
+        </div>
+      </div>
+      <div class="comparison-bars">
+        <div class="mode-bar">
+          <div class="mode-icon drive">${ICONS.car}</div>
+          <div class="mode-bar-track">
+            <div class="mode-bar-fill drive ${driveIsWinner ? 'winner' : ''}" style="width:${driveWidth}%">
+              <span class="mode-bar-time">${trip.driveTotal} min</span>
+              <span class="mode-bar-cost">${trip.route.drive.parkCost > 0 ? '$' + trip.route.drive.parkCost : ''}</span>
+            </div>
+          </div>
+        </div>
+        <div class="mode-bar">
+          <div class="mode-icon bike">${ICONS.bike}</div>
+          <div class="mode-bar-track">
+            <div class="mode-bar-fill bike ${bikeIsWinner ? 'winner' : ''}" style="width:${bikeWidth}%">
+              <span class="mode-bar-time">${trip.bikeTotal} min</span>
+              <span class="mode-bar-cost">Free</span>
+            </div>
+          </div>
+        </div>
+        ${walkBar}
+      </div>
+      <div class="expand-hint" onclick="toggleDetail(${trip.event.id})">tap for details</div>
+      <div class="trip-detail" id="detail-${trip.event.id}">
+        <div class="trip-detail-inner">
+          <div class="detail-columns">
+            ${driveBreakdown}
+            ${bikeBreakdown}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderWhyCards() {
+  const cards = [
+    {
+      icon: ICONS.shield,
+      title: 'Bike Routes You\'d Never Ride',
+      desc: 'Google Maps routes bikes on dangerous arterial roads. It ranks by distance, not safety. RouteSwap scores every route for protected lanes, traffic speed, and comfort.',
+      example: 'Google sends you down Lamar Blvd at rush hour. RouteSwap routes you on the Shoal Creek Trail — same distance, zero car traffic.',
+    },
+    {
+      icon: ICONS.speed,
+      title: 'One Speed Fits Nobody',
+      desc: 'Google assumes all cyclists ride at 8 mph. A regular commuter does 12 mph. An e-bike averages 15 mph. RouteSwap uses your actual speed.',
+      example: 'Google says your commute is 25 min by bike. Your actual time: 14 min.',
+    },
+    {
+      icon: ICONS.parking,
+      title: 'The Parking Tax is Invisible',
+      desc: 'Google\'s drive time ends at the address. In downtown Austin, add 5–15 min searching for parking, $8–15 to park, and the walk from the lot. Your real trip is 40–60% longer.',
+      example: 'Google says "Drive: 8 min." Real door-to-door: 28 min + $12.',
+    },
+    {
+      icon: ICONS.split,
+      title: 'No Proactive Comparison',
+      desc: 'To compare modes in Google Maps, open directions, check driving, switch to cycling, then walking, then do mental math. For 13 trips/week, that\'s 39 manual lookups.',
+      example: null,
+    },
+    {
+      icon: ICONS.calendar,
+      title: 'Blind to Your Schedule',
+      desc: 'Google Maps can\'t look at your calendar and say "7 of your 13 trips are faster by bike." It\'s purely reactive. RouteSwap analyzes your whole week.',
+      example: null,
+    },
+    {
+      icon: ICONS.traffic,
+      title: 'Rush Hour Changes Everything',
+      desc: 'That 8-minute drive at 10 AM becomes 18 minutes at 5:30 PM. Google shows current traffic, not future traffic at the time of your trip. RouteSwap models by day and hour.',
+      example: 'Planning Tuesday\'s 5:30 PM trip on Sunday night? Google can\'t help. RouteSwap can.',
+    },
+  ];
+
+  document.getElementById('why-grid').innerHTML = cards.map(c => `
+    <div class="why-card">
+      <div class="why-card-icon">${c.icon}</div>
+      <h3>${c.title}</h3>
+      <p>${c.desc}</p>
+      ${c.example ? `<div class="example">${c.example}</div>` : ''}
+    </div>`
+  ).join('');
+}
+
+// ===== INTERACTIONS =====
+let currentDay = 'All Week';
+let currentFilter = 'All';
+let allTrips = [];
+
+function filterDay(day) {
+  currentDay = day;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.day === day));
+  renderTrips(allTrips, currentDay, currentFilter);
+}
+
+function filterMode(mode) {
+  currentFilter = mode;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === mode));
+  renderTrips(allTrips, currentDay, currentFilter);
+}
+
+function toggleDetail(id) {
+  const el = document.getElementById(`detail-${id}`);
+  if (el) el.classList.toggle('open');
+}
+
+function animateCounters() {
+  document.querySelectorAll('.stat-value[data-target]').forEach(el => {
+    const target = parseFloat(el.dataset.target);
+    const prefix = el.dataset.prefix || '';
+    const suffix = el.dataset.suffix || '';
+    const decimals = parseInt(el.dataset.decimals || '0');
+    const duration = 1500;
+    const start = performance.now();
+
+    function tick(now) {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const value = (target * eased).toFixed(decimals);
+      el.textContent = `${prefix}${value}${suffix}`;
+      if (progress < 1) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  });
+}
+
+function animateGauge(pct) {
+  const gauge = document.getElementById('gauge');
+  const gaugeValue = document.getElementById('gauge-value');
+  const targetDeg = (pct / 100) * 360;
+  const duration = 1500;
+  const start = performance.now();
+
+  function tick(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const currentDeg = targetDeg * eased;
+    const currentPct = Math.round(pct * eased);
+    gauge.style.background = `conic-gradient(var(--green-500) 0deg, var(--green-500) ${currentDeg}deg, var(--slate-700) ${currentDeg}deg, var(--slate-700) 360deg)`;
+    gaugeValue.textContent = `${currentPct}%`;
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// ===== MAP =====
+let map = null;
+let routeLines = [];
+let markers = [];
+let activeRouteId = null;
+
+function getRouteColor(winner) {
+  if (winner === 'bike' || winner === 'walk') return '#10B981';
+  if (winner === 'close') return '#FBBF24';
+  return '#94A3B8';
+}
+
+function getRouteWeight(winner) {
+  return (winner === 'bike' || winner === 'walk') ? 4 : 3;
+}
+
+function buildPopupHtml(trip) {
+  const from = LOCATIONS[trip.event.from];
+  const to = LOCATIONS[trip.event.to];
+  let winnerLabel, winnerClass;
+  if (trip.winner === 'bike') { winnerLabel = `Bike saves ${trip.timeSaved} min`; winnerClass = 'bike'; }
+  else if (trip.winner === 'walk') { winnerLabel = `Walk saves ${trip.timeSaved} min`; winnerClass = 'walk'; }
+  else if (trip.winner === 'close') { winnerLabel = 'Close call — within 5 min'; winnerClass = 'close'; }
+  else { winnerLabel = 'Drive is faster here'; winnerClass = 'drive'; }
+
+  let walkRow = '';
+  if (trip.walkViable) {
+    walkRow = `<span class="label">Walk</span><span class="val walk">${trip.walkTotal} min · Free</span>`;
+  }
+
+  return `<div class="map-tooltip">
+    <div class="popup-title">${trip.event.time} · ${trip.event.title}</div>
+    <div class="popup-route">${from.shortName} → ${to.shortName} · ${trip.route.distanceMiles} mi</div>
+    <div class="popup-compare">
+      <span class="label">Drive</span><span class="val drive">${trip.driveTotal} min · $${trip.route.drive.parkCost}${trip.rush ? ' (rush hr)' : ''}</span>
+      <span class="label">Bike</span><span class="val bike">${trip.bikeTotal} min · Free · ${trip.route.bike.route}</span>
+      ${walkRow}
+    </div>
+    <div class="popup-winner ${winnerClass}">${winnerLabel}</div>
+  </div>`;
+}
+
+function initMap(trips) {
+  map = L.map('map', {
+    scrollWheelZoom: false,
+    zoomControl: true,
+  }).setView([30.2950, -97.7400], 12);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+    maxZoom: 19,
+  }).addTo(map);
+
+  const drawn = new Set();
+  trips.forEach(trip => {
+    const key = `${trip.event.from}|${trip.event.to}`;
+    if (!trip.route.waypoints || drawn.has(key)) return;
+    drawn.add(key);
+
+    const color = getRouteColor(trip.winner);
+    const weight = getRouteWeight(trip.winner);
+    const line = L.polyline(trip.route.waypoints, {
+      color: color,
+      weight: weight,
+      opacity: 0.7,
+      smoothFactor: 1.5,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(map);
+
+    line._tripId = trip.event.id;
+    line._routeKey = key;
+
+    line.bindPopup(buildPopupHtml(trip), { maxWidth: 320, className: 'routeswap-popup' });
+
+    line.on('click', function() {
+      highlightRoute(trip.event.id);
+      const card = document.querySelector(`.trip-card[data-trip-id="${trip.event.id}"]`);
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    line.on('mouseover', function() {
+      if (activeRouteId !== trip.event.id) {
+        this.setStyle({ weight: weight + 2, opacity: 1 });
+      }
+    });
+
+    line.on('mouseout', function() {
+      if (activeRouteId !== trip.event.id) {
+        this.setStyle({ weight: weight, opacity: 0.7 });
+      }
+    });
+
+    routeLines.push(line);
+  });
+
+  const markerLocations = new Set();
+  trips.forEach(trip => {
+    markerLocations.add(trip.event.from);
+    markerLocations.add(trip.event.to);
+  });
+
+  markerLocations.forEach(locId => {
+    const loc = LOCATIONS[locId];
+    if (!loc.lat) return;
+
+    const isHome = locId === 'hyde-park';
+    const marker = L.circleMarker([loc.lat, loc.lng], {
+      radius: isHome ? 8 : 6,
+      fillColor: isHome ? '#10B981' : '#1E293B',
+      color: '#FFFFFF',
+      weight: 2,
+      fillOpacity: 1,
+      zIndexOffset: isHome ? 1000 : 0,
+    }).addTo(map);
+
+    marker.bindTooltip(loc.shortName, {
+      permanent: false,
+      direction: 'top',
+      offset: [0, -8],
+      className: 'marker-label',
+    });
+
+    markers.push(marker);
+  });
+
+  const allPoints = trips.flatMap(t => t.route.waypoints || []);
+  if (allPoints.length > 0) {
+    map.fitBounds(L.latLngBounds(allPoints).pad(0.1));
+  }
+}
+
+function highlightRoute(tripId) {
+  routeLines.forEach(line => {
+    if (line._tripId === tripId) {
+      line.setStyle({ weight: 6, opacity: 1 });
+      line.bringToFront();
+      line.openPopup();
+      activeRouteId = tripId;
+    } else {
+      const trip = allTrips.find(t => t.event.id === line._tripId);
+      if (trip) {
+        line.setStyle({ weight: getRouteWeight(trip.winner), opacity: 0.4 });
+      }
+    }
+  });
+}
+
+function resetRouteHighlights() {
+  activeRouteId = null;
+  routeLines.forEach(line => {
+    const trip = allTrips.find(t => t.event.id === line._tripId);
+    if (trip) {
+      line.setStyle({ weight: getRouteWeight(trip.winner), opacity: 0.7 });
+    }
+  });
+}
+
+function scrollToMapAndHighlight(tripId) {
+  const trip = allTrips.find(t => t.event.id === tripId);
+  if (!trip || !trip.route.waypoints) return;
+
+  document.getElementById('map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => {
+    map.fitBounds(L.latLngBounds(trip.route.waypoints).pad(0.4), { animate: true, duration: 0.5 });
+    highlightRoute(tripId);
+  }, 400);
+}
+
+// ===== INIT =====
+function init() {
+  allTrips = EVENTS.map(computeTrip).filter(Boolean);
+  const summary = computeSummary(allTrips);
+
+  renderHero(summary);
+  renderDayTabs();
+  renderTrips(allTrips, 'All Week', 'All');
+  renderWhyCards();
+  initMap(allTrips);
+
+  setTimeout(() => {
+    animateGauge(summary.pct);
+    animateCounters();
+  }, 300);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
